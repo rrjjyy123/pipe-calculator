@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>관악기 계산기</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .keyboard { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
+    .white-key, .black-key { height: 100px; width: 40px; text-align: center; }
+    .white-key { background: white; border: 1px solid black; }
+    .black-key { background: black; color: white; width: 30px; height: 70px; margin-left: -15px; margin-right: -15px; position: relative; z-index: 1; }
+    .controls { margin-bottom: 10px; }
+    .section { display: none; }
+    .active { display: block; }
+  </style>
+</head>
+<body>
+
+<h1>관악기 계산기</h1>
+
+<!-- 기능 선택 버튼 -->
+<div>
+  <button onclick="showSection('lengthCalc')">관의 길이 계산기</button>
+  <button onclick="showSection('freqCalc')">관악기 진동수 계산기</button>
+</div>
+<hr>
+
+<!-- 관의 길이 계산기 -->
+<div id="lengthCalc" class="section active">
+  <h2>관의 길이 계산기</h2>
+
+  <div class="controls">
+    <label>현재 온도 (°C): <input type="number" id="temperature" value="20"></label><br><br>
+    <label>관의 지름 (cm): <input type="number" id="diameter" value="2"></label><br><br>
+    <div>
+      <span id="selectedNote">선택된 계이름: C4 (주파수: 261.63 Hz)</span>
+    </div>
+  </div>
+
+  <h3>계이름 선택</h3>
+  <div class="keyboard">
+    <button class="white-key" onclick="selectNote('C')">C</button>
+    <button class="black-key" onclick="selectNote('C#')">C#</button>
+    <button class="white-key" onclick="selectNote('D')">D</button>
+    <button class="black-key" onclick="selectNote('D#')">D#</button>
+    <button class="white-key" onclick="selectNote('E')">E</button>
+    <button class="white-key" onclick="selectNote('F')">F</button>
+    <button class="black-key" onclick="selectNote('F#')">F#</button>
+    <button class="white-key" onclick="selectNote('G')">G</button>
+    <button class="black-key" onclick="selectNote('G#')">G#</button>
+    <button class="white-key" onclick="selectNote('A')">A</button>
+    <button class="black-key" onclick="selectNote('A#')">A#</button>
+    <button class="white-key" onclick="selectNote('B')">B</button>
+  </div>
+
+  <div>
+    <button onclick="adjustOctave(-1)">옥타브 내리기</button>
+    <button onclick="adjustOctave(1)">옥타브 올리기</button>
+  </div>
+
+  <br>
+  <button onclick="calculateLength()">계산하기</button>
+
+  <h3 id="result"></h3>
+</div>
+
+<!-- 진동수 계산기 -->
+<div id="freqCalc" class="section">
+  <h2>관악기 진동수 계산기</h2>
+
+  <div class="controls">
+    <label>현재 온도 (°C): <input type="number" id="inv-temperature" value="20"></label><br><br>
+    <label>관의 지름 (cm): <input type="number" id="inv-diameter" value="2"></label><br><br>
+    <label>관의 길이 (cm): <input type="number" id="inv-length" value="30"></label><br><br>
+    <label><input type="radio" name="pipeType" value="open" checked> 열린 관</label>
+    <label><input type="radio" name="pipeType" value="closed"> 닫힌 관</label><br><br>
+    <button onclick="calculateInverseFrequency()">진동수 및 음계 계산하기</button>
+  </div>
+
+  <h3 id="inverse-result"></h3>
+</div>
+
+<!-- 스크립트 -->
+<script>
+  // 계이름-주파수 사전
+  const frequencies = {
+    "C2": 65.41, "C#2": 69.30, "D2": 73.42, "D#2": 77.78,
+    "E2": 82.41, "F2": 87.31, "F#2": 92.50, "G2": 98.00,
+    "G#2": 103.83, "A2": 110.00, "A#2": 116.54, "B2": 123.47,
+    "C3": 130.81, "C#3": 138.59, "D3": 146.83, "D#3": 155.56,
+    "E3": 164.81, "F3": 174.61, "F#3": 185.00, "G3": 196.00,
+    "G#3": 207.65, "A3": 220.00, "A#3": 233.08, "B3": 246.94,
+    "C4": 261.63, "C#4": 277.18, "D4": 293.66, "D#4": 311.13,
+    "E4": 329.63, "F4": 349.23, "F#4": 369.99, "G4": 392.00,
+    "G#4": 415.30, "A4": 440.00, "A#4": 466.16, "B4": 493.88,
+    "C5": 523.25, "C#5": 554.37, "D5": 587.33, "D#5": 622.25,
+    "E5": 659.25, "F5": 698.46, "F#5": 739.99, "G5": 783.99,
+    "G#5": 830.61, "A5": 880.00, "A#5": 932.33, "B5": 987.77,
+    "C6": 1046.50, "C#6": 1108.73, "D6": 1174.66, "D#6": 1244.51,
+    "E6": 1318.51, "F6": 1396.91, "F#6": 1479.98, "G6": 1567.98,
+    "G#6": 1661.22, "A6": 1760.00, "A#6": 1864.66, "B6": 1975.53,
+    "C7": 2093.00, "C#7": 2217.46, "D7": 2349.32, "D#7": 2489.02,
+    "E7": 2637.02, "F7": 2793.83, "F#7": 2959.96, "G7": 3135.96,
+    "G#7": 3322.44, "A7": 3520.00, "A#7": 3729.31, "B7": 3951.07
+  };
+
+  let currentOctave = 4;
+  let notePrefix = 'C';
+
+  function updateSelectedNote() {
+    const currentNote = `${notePrefix}${currentOctave}`;
+    const freq = frequencies[currentNote];
+    document.getElementById('selectedNote').innerText = `선택된 계이름: ${currentNote} (주파수: ${freq.toFixed(2)} Hz)`;
+  }
+
+  function selectNote(note) {
+    notePrefix = note;
+    updateSelectedNote();
+  }
+
+  function adjustOctave(delta) {
+    currentOctave = Math.min(7, Math.max(2, currentOctave + delta));
+    updateSelectedNote();
+  }
+
+  function calculateLength() {
+    const temperature = parseFloat(document.getElementById('temperature').value);
+    const diameter = parseFloat(document.getElementById('diameter').value);
+    const currentNote = `${notePrefix}${currentOctave}`;
+    const frequency = frequencies[currentNote];
+
+    const speedOfSound = 331.3 + 0.6 * temperature;
+    const endCorrection = 0.6 * (diameter / 100);
+    const length = (speedOfSound / (2 * frequency)) - endCorrection;
+
+    if (length < 0) {
+      alert("유효하지 않은 결과입니다.");
+      return;
+    }
+
+    const resultCm = (length * 100).toFixed(1);
+    document.getElementById('result').innerText = `필요한 관의 길이: ${resultCm} cm`;
+  }
+
+  function calculateInverseFrequency() {
+    const temperature = parseFloat(document.getElementById('inv-temperature').value);
+    const diameter = parseFloat(document.getElementById('inv-diameter').value);
+    const lengthCm = parseFloat(document.getElementById('inv-length').value);
+    const pipeType = document.querySelector('input[name="pipeType"]:checked').value;
+
+    const speedOfSound = 331.3 + 0.6 * temperature;
+    const endCorrection = (pipeType === 'open') ? 0.6 * (diameter / 100) : 0.3 * (diameter / 100);
+    const lengthM = lengthCm / 100;
+
+    let frequency = (pipeType === 'open')
+      ? speedOfSound / (2 * (lengthM + endCorrection))
+      : speedOfSound / (4 * (lengthM + endCorrection));
+
+    let closestNote = null;
+    let minDiff = Infinity;
+
+    for (const [note, freq] of Object.entries(frequencies)) {
+      const diff = Math.abs(freq - frequency);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestNote = note;
+      }
+    }
+
+    const closestFrequency = frequencies[closestNote];
+    const targetLength = (pipeType === 'open')
+      ? speedOfSound / (2 * closestFrequency) - endCorrection
+      : speedOfSound / (4 * closestFrequency) - endCorrection;
+
+    const lengthAdjustmentCm = ((targetLength - lengthM) * 100).toFixed(2);
+    const adjustmentText = lengthAdjustmentCm > 0
+      ? `<span style='color:blue'>&uarr; 길이를 ${lengthAdjustmentCm} cm 늘려야 합니다.</span>`
+      : lengthAdjustmentCm < 0
+        ? `<span style='color:red'>&darr; 길이를 ${Math.abs(lengthAdjustmentCm)} cm 줄여야 합니다.</span>`
+        : `<span style='color:green'>이미 정확한 길이입니다.</span>`;
+
+    document.getElementById('inverse-result').innerHTML =
+      `계산된 진동수: ${frequency.toFixed(2)} Hz (가장 가까운 음계: ${closestNote})<br>` +
+      adjustmentText;
+  }
+
+  function showSection(sectionId) {
+    document.querySelectorAll('.section').forEach(div => {
+      div.classList.remove('active');
+    });
+    document.getElementById(sectionId).classList.add('active');
+  }
+
+  updateSelectedNote();
+</script>
+
+</body>
+</html>
